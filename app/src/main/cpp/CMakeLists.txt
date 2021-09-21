@@ -12,13 +12,13 @@ find_library( # Sets the name of the path variable.
         android )
 
 find_library( media-lib mediandk )
+#find_library()
 
 
 add_library(PitchDetectionEngine
         SHARED
-        streamManaging.cpp
-        NDKExtractor.cpp
-        NDKExtractor.h
+        inputStreamManaging.cpp
+        outputStreamManaging.cpp
         jni_bridge.cpp
         )
 
@@ -28,7 +28,8 @@ add_library(PitchDetectionEngine
 #        )
 add_subdirectory("AudioFile")
 
-target_link_libraries(PitchDetectionEngine oboe::oboe android mediandk
+find_library( log-lib log )
+target_link_libraries(PitchDetectionEngine oboe::oboe android mediandk ${log-lib}
         )
 
 #target_link_libraries(

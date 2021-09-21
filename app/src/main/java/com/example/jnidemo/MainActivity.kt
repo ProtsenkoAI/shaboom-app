@@ -23,45 +23,29 @@ import kotlin.checkNotNull
 import kotlin.collections.ArrayDeque
 
 
-
 class MainActivity : AppCompatActivity(), OnClickListener {
     // TODO: move replot things to sep. component
     // TODO: create intermediate object between plotting and MicroManager's data
 
+    // TODO: fileDescriptor is not used by cpp now, rewrite file choosing
+
     override fun onCreate(savedInstanceState: Bundle?) {
-        Log.i("MainActivity", "onCreate called")
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // TODO: proper file choosing
-        val activityResultLauncher = registerForActivityResult(
+        val openSongLauncher = registerForActivityResult(
             ActivityResultContracts.OpenDocument()
-        ) { uri: Uri? ->
-            Log.i("uri: ", uri.toString())
-            filePath = uri.toString()
+
+        ) { uri: Uri? -> fileDescriptor = getFileDescriptorFromUri(uri!!) }
+
+        openSongLauncher.launch(arrayOf("*/*"))
+
+        val requestMicroPermissionLauncher = registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) {isGranted: Boolean -> microPermissionCallback(isGranted)
         }
 
-        activityResultLauncher.launch(arrayOf("*/*"))
-//        val mIntent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-//            addCategory(Intent.CATEGORY_OPENABLE)
-//            setType("*/*")
-//        }
-//
-//        startActivityForResult(mIntent, 0)
-
-
-        // TODO: ask for permission properly
-        val requestPermissionLauncher =
-            registerForActivityResult(
-                ActivityResultContracts.RequestPermission()
-            ) { isGranted: Boolean ->
-                if (isGranted) {
-
-                } else {
-
-                }
-            }
-        requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        requestMicroPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
 
         chart = findViewById(R.id.chart)
 
@@ -71,6 +55,15 @@ class MainActivity : AppCompatActivity(), OnClickListener {
 
         startButton.setOnClickListener(this)
         stopButton.setOnClickListener(this)
+    }
+
+    private fun getFileDescriptorFromUri(uri: Uri): Int {
+        val asset = this.contentResolver!!.openAssetFileDescriptor(uri, "r")!!
+        return asset.parcelFileDescriptor.detachFd()
+    }
+
+    private fun microPermissionCallback(isGranted: Boolean) {
+
     }
 
     private fun getStartButton(): Button {
@@ -96,7 +89,7 @@ class MainActivity : AppCompatActivity(), OnClickListener {
     }
 
     private fun start() {
-        outputManager = OutputManager(filePath!!)
+        outputManager = OutputManager(fileDescriptor!!)
 
         outputManager!!.turnOnStream()
         inputManager.turnOnStream()
@@ -111,7 +104,7 @@ class MainActivity : AppCompatActivity(), OnClickListener {
         replotTimer.purge() // needed to schedule the task again
     }
 
-    private var filePath: String? = null
+    private var fileDescriptor: Int? = null
     private var isStarted = false
 
     private var chart: LineChart? = null
@@ -168,24 +161,24 @@ class InputManager() {
 }
 
 
-class OutputManager(private var fileName: String) {
+class OutputManager(private var fileDescriptor: Int) {
     // TODO: fix duplication with InputManager
     companion object ExternalGate {
         init {
             System.loadLibrary("PitchDetectionEngine")
         }
 
-        external fun createEngine(fileName: String): Long
+        external fun createEngine(fileDescriptor: Int): Long
         external fun turnOnStream(engineHandle: Long): Int
         external fun turnOffStream(engineHandle: Long): Int
-        external fun hasNewPitches(engineHandle: Long): Boolean
-        external fun nextPitch(engineHandle: Long): Float
 
     }
 
     fun turnOnStream() {
         if (engineHandle === null) {
-            engineHandle = createEngine(fileName)
+            Log.i("file descriptor: ", fileDescriptor.toString())
+            engineHandle = createEngine(fileDescriptor)
+            Log.i("engine status", "engine created!")
             Log.i("engine handle: ", engineHandle.toString())
         }
         val status = ExternalGate.turnOnStream(engineHandle!!);
