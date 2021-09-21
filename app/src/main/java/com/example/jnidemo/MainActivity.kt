@@ -4,6 +4,7 @@ import android.Manifest
 import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
 
 import android.view.View
 import android.view.View.OnClickListener
@@ -20,10 +21,6 @@ import java.util.TimerTask
 
 import kotlin.checkNotNull
 import kotlin.collections.ArrayDeque
-
-import android.util.Log
-import java.lang.Integer.min
-import java.lang.Math.max
 
 
 class MainActivity : AppCompatActivity(), OnClickListener {
@@ -94,8 +91,9 @@ class MainActivity : AppCompatActivity(), OnClickListener {
 
         outputManager!!.turnOnStream()
         if (microPermGranted) {
-            inputManager.turnOnStream()
             replotTask = ReplotTask(inputManager, chart!!)
+            inputManager.turnOnStream()
+//            replotTask!!.run() // run to warm up before scheduling
             replotTimer.schedule(replotTask, 0, replotMs)
         }
     }
@@ -112,7 +110,7 @@ class MainActivity : AppCompatActivity(), OnClickListener {
     private var fileDescriptor: Int? = null
     private var isStarted = false
     private var microPermGranted = false
-    private var replotMs: Long = 300
+    private var replotMs: Long = 100
 
     private var chart: LineChart? = null
 
@@ -135,11 +133,8 @@ class ReplotTask(private var inputManager: InputManager, private var chart: Line
     private var maxY = 100.0f
 
     override fun run() {
-        val newPitches = inputManager.getPitches()
-
-        for (newPitch in newPitches) {
-            pitches1.addLast(newPitch)
-        }
+        val tsStart = System.currentTimeMillis()
+        inputManager.getPitches(pitches1)
 
         while (pitches1.size > nPoints) {
             pitches1.removeFirst()
@@ -154,6 +149,8 @@ class ReplotTask(private var inputManager: InputManager, private var chart: Line
         val lineData = LineData(dataSet)
         chart.data = lineData
         chart.invalidate()
+        val tsEnd = System.currentTimeMillis()
+        Log.i("time needed in ms", (tsEnd - tsStart).toString())
     }
 
     private fun makeDataSet(pitches: ArrayDeque<Float>): LineDataSet {

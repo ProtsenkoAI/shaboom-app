@@ -7,6 +7,9 @@
 #include <jni.h>
 // TODO: change include to import
 #include "streamManaging.cpp"
+#define APPNAME "C++NdkCodeOfJniDemo"
+#include <android/log.h>
+
 
 class InputStreamManager : public StreamManager, public oboe::AudioStreamDataCallback {
 public:
@@ -14,7 +17,7 @@ public:
         oboe::AudioStreamBuilder streamBuilder;
 
         streamBuilder.setDirection(oboe::Direction::Input);
-        streamBuilder.setSampleRate(sampleRate);
+//        streamBuilder.setSampleRate(sampleRate);
         streamBuilder.setChannelCount(inputChannelCount);
         streamBuilder.setDataCallback(this);
         streamBuilder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
@@ -26,12 +29,16 @@ public:
         return stream;
     }
 
-    std::deque<float>& takePitches() {
-        // NOTE: of course, returning deque to user we delegate our responsibility of removing
-        //  already taken data. Another approach is copy values to another container and then
-        //  remove pitches from private object, but now we don't want these overheads.
-        return pitches;
+    bool hasNextPitch() const {
+        return !pitches.empty();
     }
+
+    float nextPitch() {
+        float elem = pitches.back();
+        pitches.pop_back();
+        return elem;
+    }
+
 
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream* inpStream,
                                           void *audioData,
@@ -46,15 +53,17 @@ public:
             inputSum += *inputFloats;
             inputFloats++;
         }
+
+        __android_log_print(ANDROID_LOG_ERROR, APPNAME, "current input sum %f", inputSum);
         pitches.push_front(inputSum);
 
         return oboe::DataCallbackResult::Continue;
     }
 
-    std::deque<float> pitches;
 
 private:
+    std::deque<float> pitches;
     std::shared_ptr<oboe::AudioStream> stream;
-    int sampleRate = 48000;
+//    int sampleRate;
     int inputChannelCount = oboe::ChannelCount::Stereo;
 };

@@ -50,7 +50,8 @@ class InputManager(): StreamManager() {
             System.loadLibrary("PitchDetectionEngine")
         }
         external fun createEngine(): Long
-        external fun getPitches(engineHandle: Long): FloatArray
+        external fun hasNextPitch(engineHandle: Long): Boolean
+        external fun nextPitch(engineHandle: Long): Float
 
     }
 
@@ -58,12 +59,11 @@ class InputManager(): StreamManager() {
         return engineHandle
     }
 
-    fun getPitches(): FloatArray {
-        /** Pushes new pitches stored in c++ to pitchesDeque */
-        // TODO: optimize getting pitches from c++
-        // TODO: clear interface of passing obtained pitches (passing deque from user's component
-        //  seems like cyclic dependency)
-        return getPitches(engineHandle)
+    fun getPitches(pitchesDeque: ArrayDeque<Float>) {
+        // TODO: if hasNextPitch call is too slow, replace with one call to getNumPitches
+        while (hasNextPitch(engineHandle)) {
+            pitchesDeque.addLast(nextPitch(engineHandle))
+        }
     }
 }
 

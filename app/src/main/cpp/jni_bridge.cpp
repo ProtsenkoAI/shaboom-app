@@ -59,29 +59,49 @@ Java_com_example_jnidemo_OutputManager_00024ExternalGate_createEngine(JNIEnv*, j
     return reinterpret_cast<jlong>(manager);
 }
 
+//extern "C"
+//JNIEXPORT jfloatArray JNICALL
+//Java_com_example_jnidemo_InputManager_00024ExternalGate_getPitches(JNIEnv *env, jobject thiz,
+//                                                                   jlong engine_handle) {
+//    // TODO: implement getPitches()
+//    auto* manager = inputManagerFromHandle(engine_handle);
+//    std::deque<float>& pitches = manager->takePitches();
+//
+//    jfloatArray callerArray = env->NewFloatArray(pitches.size());
+//
+//    if (callerArray == NULL) {
+//        // TODO: refactor passing type to log msg
+//        __android_log_print(ANDROID_LOG_ERROR, APPNAME,
+//                            "failed to init java array with type %s", "jfloat");
+//        return nullptr;
+//    } else {
+//        for (int i = 0; i < pitches.size(); i++) {
+//            float pitch = pitches.back();
+//            pitches.pop_back();
+//            // we are responsive to clear deque
+//            auto jPitch = jfloat(pitch);
+//            env->SetFloatArrayRegion(callerArray, i, 1, &jPitch);
+//        }
+//    }
+//    return callerArray;
+//}
+
 extern "C"
-JNIEXPORT jfloatArray JNICALL
-Java_com_example_jnidemo_InputManager_00024ExternalGate_getPitches(JNIEnv *env, jobject thiz,
-                                                                   jlong engine_handle) {
-    // TODO: implement getPitches()
+JNIEXPORT jboolean JNICALL
+Java_com_example_jnidemo_InputManager_00024ExternalGate_hasNextPitch(JNIEnv *env, jobject thiz,
+                                                                     jlong engine_handle) {
     auto* manager = inputManagerFromHandle(engine_handle);
-    std::deque<float>& pitches = manager->takePitches();
+    bool hasNextPitch = manager->hasNextPitch();
+    return jboolean(hasNextPitch);
 
-    jfloatArray callerArray = env->NewFloatArray(pitches.size());
+}
 
-    if (callerArray == NULL) {
-        // TODO: refactor passing type to log msg
-        __android_log_print(ANDROID_LOG_ERROR, APPNAME,
-                            "failed to init java array with type %s", "jfloat");
-        return nullptr;
-    } else {
-        for (int i = 0; i < pitches.size(); i++) {
-            float pitch = pitches.back();
-            pitches.pop_back();
-            // we are responsive to clear deque
-            auto jPitch = jfloat(pitch);
-            env->SetFloatArrayRegion(callerArray, i, 1, &jPitch);
-        }
-    }
-    return callerArray;
+
+extern "C"
+JNIEXPORT jfloat JNICALL
+Java_com_example_jnidemo_InputManager_00024ExternalGate_nextPitch(JNIEnv *env, jobject thiz,
+                                                                  jlong engine_handle) {
+    auto *manager = inputManagerFromHandle(engine_handle);
+    float nextPitch = manager->nextPitch();
+    return jfloat(nextPitch);
 }
