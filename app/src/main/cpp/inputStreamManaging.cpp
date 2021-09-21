@@ -2,15 +2,13 @@
 #include<oboe/Oboe.h>
 #include<deque>
 #include<string>
-#include<random>
+#include<array>
 
-#include <android/asset_manager.h>
-#include <android/asset_manager_jni.h>
 #include <jni.h>
+// TODO: change include to import
+#include "streamManaging.cpp"
 
-class InputStreamManager : oboe::AudioStreamDataCallback {
-    // TODO: check results opening streams and start / stop are OK
-    // TODO: separate storing data from stream from this class
+class InputStreamManager : public StreamManager, public oboe::AudioStreamDataCallback {
 public:
     InputStreamManager () {
         oboe::AudioStreamBuilder streamBuilder;
@@ -19,39 +17,20 @@ public:
         streamBuilder.setSampleRate(sampleRate);
         streamBuilder.setChannelCount(inputChannelCount);
         streamBuilder.setDataCallback(this);
+        streamBuilder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
 
         streamBuilder.openStream(stream);
 
     }
-    int turnOn () {
-        oboe::Result result = stream->requestStart();
-        return getResultCode(result);
-
+    std::shared_ptr<oboe::AudioStream> getStream() override {
+        return stream;
     }
 
-    int turnOff () {
-        oboe::Result result = stream->requestStop();
-        return getResultCode(result);
-    }
-
-    static int getResultCode(oboe::Result result) {
-        if (result == oboe::Result::OK) {
-            return 0;
-        } else {
-            return 1;
-        }
-    }
-
-    // TODO: iterator functionality using hasNextPitch and nextPitch, later will do it better
-    bool hasNextPitch() {
-        /**Checks whether nextPitch can return new pitch or not */
-        return !pitches.empty();
-    }
-
-    float nextPitch() {
-        float pitch = pitches.back();
-        pitches.pop_back();
-        return pitch;
+    std::deque<float>& takePitches() {
+        // NOTE: of course, returning deque to user we delegate our responsibility of removing
+        //  already taken data. Another approach is copy values to another container and then
+        //  remove pitches from private object, but now we don't want these overheads.
+        return pitches;
     }
 
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream* inpStream,
@@ -67,16 +46,15 @@ public:
             inputSum += *inputFloats;
             inputFloats++;
         }
-//        pitches.push_front(inputSum);// TODO: uncomment!
+        pitches.push_front(inputSum);
 
         return oboe::DataCallbackResult::Continue;
     }
 
-    std::deque<float> pitches = {4.f, 3.f, 2.f};
+    std::deque<float> pitches;
 
 private:
     std::shared_ptr<oboe::AudioStream> stream;
     int sampleRate = 48000;
     int inputChannelCount = oboe::ChannelCount::Stereo;
 };
-

@@ -2,25 +2,23 @@
 #include <string>
 #include <jni.h>
 #include<oboe/Oboe.h>
-#include<deque>
-#include<random>
-
-#include <android/asset_manager.h>
-#include <android/asset_manager_jni.h>
-
 #include <android/log.h>
 
+#include"streamManaging.cpp"
+// TODO: refactor logging
 #define APPNAME "C++NdkCodeOfJniDemo"
 
 
-class OutputStreamManager : oboe::AudioStreamDataCallback {
+class OutputStreamManager : public StreamManager, oboe::AudioStreamDataCallback {
 // TODO: fix sample rate issues
 public:
+
     explicit OutputStreamManager(int fd) {
-        __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "The value of 1 + 1 is %d", 1+1);
         bool loadSuccess = audioFile.load(fd);
 
         if (!loadSuccess) {
+            __android_log_print(ANDROID_LOG_ERROR, APPNAME,
+                                "failed to load audio with %d descriptor", fd);
             exit(999);
         } else {
         }
@@ -32,29 +30,13 @@ public:
         streamBuilder.setChannelCount(oboe::Stereo);
         streamBuilder.setDataCallback(this);
         streamBuilder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
-
-//        streamBuilder.setBufferCapacityInFrames(240 / 20);
-
         streamBuilder.openStream(stream);
     }
-    int turnOn () {
-        oboe::Result result = stream->requestStart();
-        return getResultCode(result);
-        return 0;
-    }
 
-    int turnOff () {
-        oboe::Result result = stream->requestStop();
-        return getResultCode(result);
-    }
-
-    static int getResultCode(oboe::Result result) {
-        if (result == oboe::Result::OK) {
-            return 0;
-        } else {
-            return 1;
-        }
-    }
+    std::shared_ptr<oboe::AudioStream> getStream() override {
+        __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "getStream called");
+        return stream;
+    };
 
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream* inpStream,
                                           void *voidAudioData,
@@ -75,8 +57,6 @@ public:
 private:
     AudioFile<float> audioFile;
     long int mReadIndex = 0;
-//    int mNumSamples;
-//    float* mDataBuffer{};
     std::shared_ptr<oboe::AudioStream> stream;
     int sampleRate = 48000;
 };

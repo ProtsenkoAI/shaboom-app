@@ -1,73 +1,58 @@
 #include <jni.h>
+#include <string>
+
+#include"streamManaging.cpp"
 #include"inputStreamManaging.cpp"
+#include"outputStreamManaging.cpp"
+#include<deque>
+#define APPNAME "C++NdkCodeOfJniDemo"
+
+StreamManager* streamManagerFromHandle (jlong engineHandle) {
+    auto* manager = reinterpret_cast<StreamManager *>(engineHandle);
+    return manager;
+}
+
 
 InputStreamManager* inputManagerFromHandle (jlong engineHandle) {
     auto* manager = reinterpret_cast<InputStreamManager *>(engineHandle);
     return manager;
 }
 
-#include"outputStreamManaging.cpp"
+jfloatArray createdArr;
 
-OutputStreamManager* outputManagerFromHandle (jlong engineHandle) {
-    auto* manager = reinterpret_cast<OutputStreamManager *>(engineHandle);
-    return manager;
-}
-
-
-extern "C"
-JNIEXPORT jlong JNICALL
-Java_com_example_jnidemo_InputManager_00024ExternalGate_createEngine(JNIEnv *env, jobject thiz) {
-    auto* manager = new InputStreamManager();
-    return reinterpret_cast<jlong>(manager);
-}
 
 extern "C"
 JNIEXPORT jint JNICALL
-Java_com_example_jnidemo_InputManager_00024ExternalGate_turnOnStream(JNIEnv *env, jobject thiz,
+Java_com_example_jnidemo_StreamManager_00024ExternalGate_turnOnStream(JNIEnv*, jobject,
                                                                       jlong engine_handle) {
-    auto* manager = inputManagerFromHandle(engine_handle);
+    auto* manager = streamManagerFromHandle(engine_handle);
     auto status = manager->turnOn();
-//    int status = 0;
-//    return reinterpret_cast<jint>(status);
     return reinterpret_cast<jint>(status);
 }
+
+
 extern "C"
 JNIEXPORT jint JNICALL
-Java_com_example_jnidemo_InputManager_00024ExternalGate_turnOffStream(JNIEnv *env, jobject thiz,
-                                                                     jlong engine_handle) {
-    auto* manager = inputManagerFromHandle(engine_handle);
+Java_com_example_jnidemo_StreamManager_00024ExternalGate_turnOffStream(JNIEnv*, jobject,
+                                                                       jlong engine_handle) {
+    auto* manager = streamManagerFromHandle(engine_handle);
     auto status = manager->turnOff();
     return reinterpret_cast<jint>(status);
 }
 
-extern "C"
-JNIEXPORT jboolean JNICALL
-Java_com_example_jnidemo_InputManager_00024ExternalGate_hasNewPitches(JNIEnv *env, jobject thiz,
-                                                                      jlong engine_handle) {
-    auto* manager = inputManagerFromHandle(engine_handle);
-    auto hasNewPitches = manager->hasNextPitch();
-    return jboolean(hasNewPitches);
-
-}
-extern "C"
-JNIEXPORT jfloat JNICALL
-Java_com_example_jnidemo_InputManager_00024ExternalGate_nextPitch(JNIEnv *env, jobject thiz,
-                                                                  jlong engine_handle) {
-    auto* manager = inputManagerFromHandle(engine_handle);
-    float pitch = manager->nextPitch();
-    return jfloat(pitch);
-}
-
-//#include "/home/arseny/Android/Sdk/ndk/23.0.7599858/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/android/file_descriptor_jni.h"
-#include <string>
 
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_com_example_jnidemo_OutputManager_00024ExternalGate_createEngine(JNIEnv *env, jobject thiz,
+Java_com_example_jnidemo_InputManager_00024ExternalGate_createEngine(JNIEnv*, jobject) {
+    auto* manager = new InputStreamManager();
+    return reinterpret_cast<jlong>(manager);
+}
+
+
+extern "C"
+JNIEXPORT jlong JNICALL
+Java_com_example_jnidemo_OutputManager_00024ExternalGate_createEngine(JNIEnv*, jobject,
                                                                       jint file_descriptor) {
-    // TODO: remove using file_descriptor;
-//    const char *path = env->GetStringUTFChars(songPath, NULL);
-//    const std::string path = "/storage/emulated/0/Download/file_example_WAV_10MG.wav";
     const int fd = reinterpret_cast<int>(file_descriptor);
 
     auto* manager = new OutputStreamManager(fd);
@@ -75,20 +60,28 @@ Java_com_example_jnidemo_OutputManager_00024ExternalGate_createEngine(JNIEnv *en
 }
 
 extern "C"
-JNIEXPORT jint JNICALL
-Java_com_example_jnidemo_OutputManager_00024ExternalGate_turnOnStream(JNIEnv *env, jobject thiz,
-                                                                      jlong engine_handle) {
-    auto* manager = outputManagerFromHandle(engine_handle);
-    int status = manager->turnOn();
-//    int one = 1;
-//    return reinterpret_cast<jint>(one);
-    return reinterpret_cast<jint>(status);
-}
-extern "C"
-JNIEXPORT jint JNICALL
-Java_com_example_jnidemo_OutputManager_00024ExternalGate_turnOffStream(JNIEnv *env, jobject thiz,
-                                                                       jlong engine_handle) {
-    auto* manager = outputManagerFromHandle(engine_handle);
-    int status = manager->turnOff();
-    return reinterpret_cast<jint>(status);
+JNIEXPORT jfloatArray JNICALL
+Java_com_example_jnidemo_InputManager_00024ExternalGate_getPitches(JNIEnv *env, jobject thiz,
+                                                                   jlong engine_handle) {
+    // TODO: implement getPitches()
+    auto* manager = inputManagerFromHandle(engine_handle);
+    std::deque<float>& pitches = manager->takePitches();
+
+    jfloatArray callerArray = env->NewFloatArray(pitches.size());
+
+    if (callerArray == NULL) {
+        // TODO: refactor passing type to log msg
+        __android_log_print(ANDROID_LOG_ERROR, APPNAME,
+                            "failed to init java array with type %s", "jfloat");
+        return nullptr;
+    } else {
+        for (int i = 0; i < pitches.size(); i++) {
+            float pitch = pitches.back();
+            pitches.pop_back();
+            // we are responsive to clear deque
+            auto jPitch = jfloat(pitch);
+            env->SetFloatArrayRegion(callerArray, i, 1, &jPitch);
+        }
+    }
+    return callerArray;
 }

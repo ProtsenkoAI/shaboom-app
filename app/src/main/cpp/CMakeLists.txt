@@ -17,6 +17,7 @@ find_library( media-lib mediandk )
 
 add_library(PitchDetectionEngine
         SHARED
+        streamManaging.cpp
         inputStreamManaging.cpp
         outputStreamManaging.cpp
         jni_bridge.cpp
