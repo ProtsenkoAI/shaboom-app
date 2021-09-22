@@ -10,10 +10,16 @@
 #define APPNAME "C++NdkCodeOfJniDemo"
 #include <android/log.h>
 
+#include "../jni/c/c_api.h"
+#include "../jni/c/common.h"
+#include "../jni/builtin_ops.h"
+
 
 class InputStreamManager : public StreamManager, public oboe::AudioStreamDataCallback {
 public:
-    InputStreamManager () {
+    explicit InputStreamManager (const char* modelPath) {
+        pitchModel = TfLiteModelCreateFromFile(modelPath);
+
         oboe::AudioStreamBuilder streamBuilder;
 
         streamBuilder.setDirection(oboe::Direction::Input);
@@ -21,6 +27,7 @@ public:
         streamBuilder.setChannelCount(inputChannelCount);
         streamBuilder.setDataCallback(this);
         streamBuilder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
+        streamBuilder.setFramesPerDataCallback(modelInputSize);
 
         streamBuilder.openStream(stream);
 
@@ -47,23 +54,35 @@ public:
 
         const auto *inputFloats = static_cast<const float *>(audioData);
 
-        auto numSamples = numFrames * inpStream->getChannelCount();
-        float inputSum = 0;
-        for (int i = 0; i < numSamples; i++) {
-            inputSum += *inputFloats;
-            inputFloats++;
-        }
+//        auto numSamples = numFrames * inpStream->getChannelCount();
+//        float inputSum = 0;
+//        for (int i = 0; i < numSamples; i++) {
+//            inputSum += *inputFloats;
+//            inputFloats++;
+//        }
 
-        __android_log_print(ANDROID_LOG_ERROR, APPNAME, "current input sum %f", inputSum);
-        pitches.push_front(inputSum);
+        // 1. normalize
+
+
+        // 2. get model predictions
+
+        
+        // 3. clear out too low and too high pitch predictions
+
+        // 4. get confidence and predicted pitch
+
+        __android_log_print(ANDROID_LOG_ERROR, APPNAME, "current input size %d", numFrames);
+        pitches.push_front(numFrames);
 
         return oboe::DataCallbackResult::Continue;
     }
 
 
 private:
+    TfLiteModel * pitchModel;
     std::deque<float> pitches;
     std::shared_ptr<oboe::AudioStream> stream;
 //    int sampleRate;
     int inputChannelCount = oboe::ChannelCount::Stereo;
+    int modelInputSize = 1024;
 };
