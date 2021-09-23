@@ -43,11 +43,16 @@ Java_com_example_jnidemo_StreamManager_00024ExternalGate_turnOffStream(JNIEnv*, 
 
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_com_example_jnidemo_InputManager_00024ExternalGate_createEngine(JNIEnv*, jobject) {
+Java_com_example_jnidemo_InputManager_00024ExternalGate_createEngine(JNIEnv*, jobject, jobject assetManager) {
     // TODO: refactor work with model path
-    char modelPath[] = "/home/arseny/Projects/android/JniDemo/app/src/main/ml/crepe-medium.tflite";
-    char* modelPathPointer = modelPath;
-    auto* manager = new InputStreamManager(modelPathPointer);
+
+    char cwd[1024];
+    if (getcwd(cwd, sizeof(cwd)) != NULL)
+        __android_log_print(ANDROID_LOG_INFO, "ndk cwd", "%s", cwd);
+
+//    char modelPath[] = "../ml/crepe-medium.tflite";
+//    char* modelPathPointer = modelPath;
+    auto* manager = new InputStreamManager();
     return reinterpret_cast<jlong>(manager);
 }
 

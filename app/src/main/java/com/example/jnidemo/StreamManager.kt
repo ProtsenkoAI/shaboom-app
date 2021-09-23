@@ -1,5 +1,6 @@
 package com.example.jnidemo
 
+import android.content.res.AssetManager
 import android.util.Log
 
 abstract class StreamManager() {
@@ -42,14 +43,14 @@ abstract class StreamManager() {
 }
 
 
-class InputManager(): StreamManager() {
-    private var engineHandle: Long = createEngine()
+class InputManager(assetManager: AssetManager): StreamManager() {
+    private var engineHandle: Long = createEngine(assetManager)
 
     companion object ExternalGate {
         init {
             System.loadLibrary("PitchDetectionEngine")
         }
-        external fun createEngine(): Long
+        external fun createEngine(assetManager: AssetManager): Long
         external fun hasNextPitch(engineHandle: Long): Boolean
         external fun nextPitch(engineHandle: Long): Float
 

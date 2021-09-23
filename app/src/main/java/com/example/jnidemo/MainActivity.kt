@@ -15,6 +15,7 @@ import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
+import java.io.File
 
 import java.util.Timer
 import java.util.TimerTask
@@ -28,6 +29,12 @@ class MainActivity : AppCompatActivity(), OnClickListener {
     // TODO: create intermediate object between plotting and MicroManager's data
 
     override fun onCreate(savedInstanceState: Bundle?) {
+//        val path = applicationInfo.dataDir
+//        File(path).walkTopDown().forEach { println(it) }
+//        val openFdRes = assets.open("crepe-medium.tflite").
+//        println(openFdRes.toString())
+
+
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
@@ -114,7 +121,7 @@ class MainActivity : AppCompatActivity(), OnClickListener {
 
     private var chart: LineChart? = null
 
-    private var inputManager = InputManager()
+    private var inputManager = InputManager(assets)
     private var outputManager: OutputManager? = null
 
     private var replotTask: ReplotTask? = null
