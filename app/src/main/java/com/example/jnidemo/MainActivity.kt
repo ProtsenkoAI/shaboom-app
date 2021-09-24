@@ -1,6 +1,7 @@
 package com.example.jnidemo
 
 import android.Manifest
+import android.content.res.Resources
 import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -15,7 +16,9 @@ import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
+import com.github.mikephil.charting.interfaces.datasets.ILineDataSet
 import java.io.File
+import java.io.FileOutputStream
 
 import java.util.Timer
 import java.util.TimerTask
@@ -27,12 +30,23 @@ import kotlin.collections.ArrayDeque
 class MainActivity : AppCompatActivity(), OnClickListener {
     // TODO (not urgent): move replot things to sep. component
     // TODO: create intermediate object between plotting and MicroManager's data
+    // TODO: move working with ML model to stream managing
 
     override fun onCreate(savedInstanceState: Bundle?) {
 //        val path = applicationInfo.dataDir
 //        File(path).walkTopDown().forEach { println(it) }
-//        val openFdRes = assets.open("crepe-medium.tflite").
-//        println(openFdRes.toString())
+        // copy model to files dir
+        val modelPath = "crepe-medium.tflite"
+        val inpModelStream = assets.open(modelPath)
+
+        val outFile = File(getFilesDir(), modelPath)
+        val outModelStream = FileOutputStream(outFile)
+
+        inpModelStream.copyTo(outModelStream)
+
+        // check if file exists
+        println("created file exists and path")
+        println(outFile.exists().toString() + " " + outFile.absolutePath)
 
 
         super.onCreate(savedInstanceState)
@@ -60,6 +74,11 @@ class MainActivity : AppCompatActivity(), OnClickListener {
 
         startButton.setOnClickListener(this)
         stopButton.setOnClickListener(this)
+    }
+
+    fun songEndCallback() {
+        isStarted = false
+        stop()
     }
 
     private fun getFileDescriptorFromUri(uri: Uri): Int {
@@ -94,11 +113,11 @@ class MainActivity : AppCompatActivity(), OnClickListener {
     }
 
     private fun start() {
-        outputManager = OutputManager(fileDescriptor!!)
+        outputManager = OutputManager(fileDescriptor!!, ::songEndCallback )
 
         outputManager!!.turnOnStream()
         if (microPermGranted) {
-            replotTask = ReplotTask(inputManager, chart!!)
+            replotTask = ReplotTask(inputManager, chart!!, resources)
             inputManager.turnOnStream()
 //            replotTask!!.run() // run to warm up before scheduling
             replotTimer.schedule(replotTask, 0, replotMs)
@@ -121,7 +140,7 @@ class MainActivity : AppCompatActivity(), OnClickListener {
 
     private var chart: LineChart? = null
 
-    private var inputManager = InputManager(assets)
+    private var inputManager = InputManager()
     private var outputManager: OutputManager? = null
 
     private var replotTask: ReplotTask? = null
@@ -130,46 +149,81 @@ class MainActivity : AppCompatActivity(), OnClickListener {
 }
 
 
-class ReplotTask(private var inputManager: InputManager, private var chart: LineChart) : TimerTask() {
+class ReplotTask(private var inputManager: InputManager,
+                 private var chart: LineChart,
+                 private var resources: Resources
+                ) : TimerTask() {
     // TODO: fill pitches with start value if needed for proper plotting
-    // TODO: rename pitches1 to pitches
-    private var pitches1 = ArrayDeque<Float>()
+    private var pitches = ArrayDeque<Float>()
     private val nPoints = 200
-    // TODO: ylims
-    private var minY = -100.0f
-    private var maxY = 100.0f
+    private val userPitchNPoints = 60
+    private var minY = 80.0f
+    private var maxY = 220.0f
 
     override fun run() {
         val tsStart = System.currentTimeMillis()
-        inputManager.getPitches(pitches1)
+        inputManager.getPitches(pitches)
 
-        while (pitches1.size > nPoints) {
-            pitches1.removeFirst()
+        while (pitches.size > userPitchNPoints) {
+            pitches.removeFirst()
         }
-        pitches1.addFirst(minY)
-        pitches1.addFirst(maxY)
 
-        val dataSet = makeDataSet(pitches1)
-        dataSet.color = R.color.design_default_color_primary_dark
-        dataSet.valueTextColor = R.color.design_default_color_secondary
+        val dataSets = makeDataSetParts(pitches)
 
-        val lineData = LineData(dataSet)
+        val lineData = LineData(dataSets as List<ILineDataSet>?)
         chart.data = lineData
+
+        // styling
+        val xAxis = chart.xAxis
+        val leftAxis = chart.axisLeft
+        val rightAxis = chart.axisRight
+
+        leftAxis.axisMinimum = minY
+        leftAxis.axisMaximum = maxY
+
+        chart.legend.isEnabled = false
+        chart.description.isEnabled = false
+        xAxis.isEnabled = false
+        leftAxis.isEnabled = false
+        rightAxis.isEnabled = false
+
+        xAxis.axisMinimum = 0.0f
+        xAxis.axisMaximum = nPoints.toFloat()
+
         chart.invalidate()
         val tsEnd = System.currentTimeMillis()
         Log.i("time needed in ms", (tsEnd - tsStart).toString())
     }
 
-    private fun makeDataSet(pitches: ArrayDeque<Float>): LineDataSet {
+    private fun makeDataSetParts(pitches: ArrayDeque<Float>): ArrayList<ILineDataSet> {
+        val datasets = ArrayList<ILineDataSet>()
+
         // TODO: (maybe) reuse old entries
-        val entries = mutableListOf<Entry>()
+        var entries = mutableListOf<Entry>()
         for ((idx, value) in pitches.withIndex()) {
-            entries.add(Entry(idx.toFloat(), value))
+            if (value != -1.0f) { // -1 is filling value when there's no detected pitch
+                entries.add(Entry(idx.toFloat(), value))
+            } else {
+                if (entries.size > 0) {
+                    datasets.add(createStyledDataSet(entries))
+                    entries = mutableListOf<Entry>()
+                }
+            }
         }
-        return LineDataSet(entries, "Label")
+        if (entries.size > 0) {
+            datasets.add(createStyledDataSet(entries))
+        }
+        return datasets
     }
 
+    private fun createStyledDataSet(entries: MutableList<Entry>): LineDataSet {
+        val dataSet = LineDataSet(entries, "Label")
+        dataSet.color = resources.getColor(R.color.design_default_color_primary)
+
+        dataSet.fillAlpha = 0
+        dataSet.lineWidth = 3.0f
+        dataSet.setDrawCircles(false)
+        dataSet.setDrawValues(false)
+        return dataSet
+    }
 }
-
-
-

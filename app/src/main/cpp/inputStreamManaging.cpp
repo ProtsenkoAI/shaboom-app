@@ -14,61 +14,21 @@
 #include "../jni/c/common.h"
 #include "../jni/builtin_ops.h"
 #include "../jni/c/c_api_types.h"
-#include "../jni/model_builder.h"
 
 #include <android/asset_manager.h>
 #include <android/asset_manager_jni.h>
 
+#include <cstdint>
+
 
 class InputStreamManager : public StreamManager, public oboe::AudioStreamDataCallback {
+    // TODO: rewrite for stereo
+    // TODO: add filtering of pitches based on accumulated sum and count (to prevent spikes
+    //  in silence)
 public:
-    explicit InputStreamManager (AAssetManager* assetManager) {
-        // Open the file from assets in BUFFER_MODE
-// Streaming might work too?
-        AAsset* asset = AAssetManager_open(assetManager, "crepe-medium.tflite", AASSET_MODE_BUFFER);
-
-        if(asset == NULL)
-        {
-            __android_log_print(ANDROID_LOG_ERROR, APPNAME, "couldn't load asset");
-            exit(1);
-        }
-        off_t start;
-        off_t length;
-        const int fd = AAsset_openFileDescriptor(asset, &start, &length);
-
-        off_t  dataSize = AAsset_getLength(asset);
-        const void* const memory = AAsset_getBuffer(asset);
-
-// Use as const char*
-        const char* const memChar = (const char*) memory;
-
-// Create a new Buffer for the FlatBuffer with the size needed.
-// It has to exist alongside the FlatBuffer model as long as the model shall exist!
-// char* flatBuffersBuffer; (declared in the header file of the class in which I use this).
-        flatBuffersBuffer = new char[dataSize];
-
-        __android_log_print(ANDROID_LOG_ERROR, APPNAME, "copy asset to buffer, size: %ld", dataSize);
-        for(int i = 0; i < dataSize; i++)
-        {
-            flatBuffersBuffer[i] = memChar[i];
-        }
-
-        pitchModel = tflite::FlatBufferModel::BuildFromBuffer(flatBuffersBuffer, dataSize);
-
-        if (!pitchModel) {
-            __android_log_print(ANDROID_LOG_ERROR, APPNAME, "couldn't load from buffer");
-        }
-        __android_log_print(ANDROID_LOG_INFO, APPNAME, "successfully loaded pitchModel");
-
-// Make sure NOT to delete the flatBuffersBuffer now! If you would do it your models won't work!
-// As long as you want to use the FlatBuffer model, the flatBuffersBuffer has to exist!
-
-//        if (this->model)
-//        {
-//            // And so on...
-//        }
+    explicit InputStreamManager (char* modelPath) {
         // TODO: move pitch detection to separate object
-//        pitchModel = TfLiteModelCreateFromFile(modelPath);
+        pitchModel = TfLiteModelCreateFromFile(modelPath);
         TfLiteInterpreterOptions* options = TfLiteInterpreterOptionsCreate();
 
         tfInterpreter = TfLiteInterpreterCreate(pitchModel, options);
@@ -79,7 +39,7 @@ public:
         oboe::AudioStreamBuilder streamBuilder;
 
         streamBuilder.setDirection(oboe::Direction::Input);
-//        streamBuilder.setSampleRate(sampleRate);
+        streamBuilder.setSampleRate(modelSampleRate);
         streamBuilder.setChannelCount(inputChannelCount);
         streamBuilder.setDataCallback(this);
         streamBuilder.setPerformanceMode(oboe::PerformanceMode::LowLatency);
@@ -88,8 +48,15 @@ public:
         streamBuilder.openStream(stream);
 
     }
-    std::shared_ptr<oboe::AudioStream> getStream() override {
-        return stream;
+
+    int turnOn () override {
+        oboe::Result result = stream->requestStart();
+        return getResultCode(result);
+    }
+
+    int turnOff () override {
+        oboe::Result result = stream->requestStop();
+        return getResultCode(result);
     }
 
     bool hasNextPitch() const {
@@ -105,8 +72,9 @@ public:
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream* inpStream,
                                           void *audioData,
                                           int32_t numFrames) override {
-        // TODO: pitch detection
-
+        if (numFrames <= 0) {
+            throw std::invalid_argument("numFrames should be positive");
+        }
         const auto *inputFloats = static_cast<const float *>(audioData);
 
 //        auto numSamples = numFrames * inpStream->getChannelCount();
@@ -116,49 +84,90 @@ public:
 //            inputFloats++;
 //        }
 
-//        TfLiteStatus from_status = TfLiteTensorCopyFromBuffer(
-//                inputTensor,
-//                inputFloats,
-//                TfLiteTensorByteSize(inputTensor));
-//        TfLiteStatus interpreter_invoke_status = TfLiteInterpreterInvoke(tfInterpreter);
-//        TfLiteStatus to_status = TfLiteTensorCopyToBuffer(
-//                outTensor,
-//                pitchProbs,
-//                TfLiteTensorByteSize(outTensor));
+        float inpMean = calcMean(inputFloats, numFrames);
+        float inpStd = calcStd(inputFloats, inpMean, numFrames);
+        __android_log_print(ANDROID_LOG_INFO, APPNAME, "inp mean %f", inpMean);
+        __android_log_print(ANDROID_LOG_INFO, APPNAME, "inp std %f", inpStd);
 
-        // TODO
-        // 1. normalize
+        // TODO: maybe should apply batches here (e.g, now input has size (1024,), but
+        //  should be (1, 1024)
+        float inputNormalized[modelInputSize] = {};
+        for (int i = 0; i < numFrames; i++) {
+            inputNormalized[i] = (inputFloats[i] - inpMean) / inpStd;
+        }
 
+        float* inputNormalizedPointer = inputNormalized;
 
         // 2. get model predictions
+        TfLiteStatus from_status = TfLiteTensorCopyFromBuffer(
+                inputTensor,
+                inputNormalizedPointer,
+                TfLiteTensorByteSize(inputTensor));
 
+        TfLiteStatus interpreter_invoke_status = TfLiteInterpreterInvoke(tfInterpreter);
+        TfLiteStatus to_status = TfLiteTensorCopyToBuffer(
+                outTensor,
+                pitchProbs,
+                TfLiteTensorByteSize(outTensor));
 
+        __android_log_print(ANDROID_LOG_INFO, APPNAME, "from status %u", from_status);
+        __android_log_print(ANDROID_LOG_INFO, APPNAME, "invoke status %u", interpreter_invoke_status);
+        __android_log_print(ANDROID_LOG_INFO, APPNAME, "to status %u", to_status);
 
-        // 3. clear out too low and too high pitch predictions
+        int bestPitch = -1;
+        float currPitchMax = -1.0f;
 
-        // 4. get confidence and predicted pitch
-
-        __android_log_print(ANDROID_LOG_INFO, APPNAME, "current out size %d", pitchModelOutSize);
-        pitches.push_front(numFrames);
+        for (int i = std::max(minPitch, 0); i <= std::min(maxPitch, pitchModelOutSize - 1); i++) {
+            if (pitchProbs[0][i] > currPitchMax) {
+                currPitchMax = pitchProbs[0][i];
+                bestPitch = i;
+            }
+        }
+        if (currPitchMax >= pitchThresh) {
+            pitches.push_front(bestPitch);
+        } else {
+            pitches.push_front(-1);
+        }
 
         return oboe::DataCallbackResult::Continue;
     }
 
 
 private:
-    char* flatBuffersBuffer;
+    static float calcMean(const float * arr, int length) {
+        float sum = 0;
+        for (int i = 0; i < length; i++) {
+            sum += arr[i];
+        }
+        return sum / length;
+    }
 
-    int modelInputSize = 1024;
+    float calcStd(const float * arr, float& mean, int length) {
+        float var = 0;
+        for(int i = 0; i < length; i++)
+        {
+            var += (arr[i] - mean) * (arr[i] - mean);
+        }
+        var /= length;
+        float standardDeviation = sqrt(var);
+        return standardDeviation;
+    }
+    // TODO: set min amd max pitches (and probably threshold) using user data
+    const int minPitch = 80;
+    const int maxPitch = 220;
+    constexpr const static float pitchThresh = 0.5;
+
+    const static int modelInputSize = 1024;
     static const int pitchModelOutSize = 360;
+    static const int modelSampleRate = 16000;
 
     TfLiteModel * pitchModel {};
     TfLiteInterpreter * tfInterpreter;
     TfLiteTensor * inputTensor;
     const TfLiteTensor * outTensor;
-    double pitchProbs[pitchModelOutSize] {};
+    float pitchProbs[1][pitchModelOutSize] {};
 
     std::deque<float> pitches;
     std::shared_ptr<oboe::AudioStream> stream;
-//    int sampleRate;
-    int inputChannelCount = oboe::ChannelCount::Stereo;
+    int inputChannelCount = oboe::ChannelCount::Mono;
 };

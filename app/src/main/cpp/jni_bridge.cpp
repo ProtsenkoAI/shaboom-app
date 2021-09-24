@@ -43,16 +43,16 @@ Java_com_example_jnidemo_StreamManager_00024ExternalGate_turnOffStream(JNIEnv*, 
 
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_com_example_jnidemo_InputManager_00024ExternalGate_createEngine(JNIEnv*, jobject, jobject assetManager) {
+Java_com_example_jnidemo_InputManager_00024ExternalGate_createEngine(JNIEnv*, jobject) {
     // TODO: refactor work with model path
 
     char cwd[1024];
     if (getcwd(cwd, sizeof(cwd)) != NULL)
         __android_log_print(ANDROID_LOG_INFO, "ndk cwd", "%s", cwd);
 
-//    char modelPath[] = "../ml/crepe-medium.tflite";
-//    char* modelPathPointer = modelPath;
-    auto* manager = new InputStreamManager();
+    char modelPath[] = "/data/user/0/com.example.jnidemo/files/crepe-medium.tflite";
+    char* modelPathPointer = modelPath;
+    auto* manager = new InputStreamManager(modelPathPointer);
     return reinterpret_cast<jlong>(manager);
 }
 
@@ -66,33 +66,6 @@ Java_com_example_jnidemo_OutputManager_00024ExternalGate_createEngine(JNIEnv*, j
     auto* manager = new OutputStreamManager(fd);
     return reinterpret_cast<jlong>(manager);
 }
-
-//extern "C"
-//JNIEXPORT jfloatArray JNICALL
-//Java_com_example_jnidemo_InputManager_00024ExternalGate_getPitches(JNIEnv *env, jobject thiz,
-//                                                                   jlong engine_handle) {
-//    // TODO: implement getPitches()
-//    auto* manager = inputManagerFromHandle(engine_handle);
-//    std::deque<float>& pitches = manager->takePitches();
-//
-//    jfloatArray callerArray = env->NewFloatArray(pitches.size());
-//
-//    if (callerArray == NULL) {
-//        // TODO: refactor passing type to log msg
-//        __android_log_print(ANDROID_LOG_ERROR, APPNAME,
-//                            "failed to init java array with type %s", "jfloat");
-//        return nullptr;
-//    } else {
-//        for (int i = 0; i < pitches.size(); i++) {
-//            float pitch = pitches.back();
-//            pitches.pop_back();
-//            // we are responsive to clear deque
-//            auto jPitch = jfloat(pitch);
-//            env->SetFloatArrayRegion(callerArray, i, 1, &jPitch);
-//        }
-//    }
-//    return callerArray;
-//}
 
 extern "C"
 JNIEXPORT jboolean JNICALL
@@ -112,4 +85,13 @@ Java_com_example_jnidemo_InputManager_00024ExternalGate_nextPitch(JNIEnv *env, j
     auto *manager = inputManagerFromHandle(engine_handle);
     float nextPitch = manager->nextPitch();
     return jfloat(nextPitch);
+}
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_example_jnidemo_OutputManager_00024ExternalGate_getIsPlaying(JNIEnv *env,
+                                                                      jobject thiz,
+                                                                      jlong engine_handle) {
+    auto* manager = reinterpret_cast<OutputStreamManager *>(engine_handle);
+    bool isPlaying = manager->getIsPlaying();
+    return jboolean(isPlaying);
 }

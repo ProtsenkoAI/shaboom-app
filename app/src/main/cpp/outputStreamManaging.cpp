@@ -15,6 +15,7 @@ public:
 
     explicit OutputStreamManager(int fd) {
         bool loadSuccess = audioFile.load(fd);
+        numFileSamples = audioFile.getNumSamplesPerChannel();
 
         if (!loadSuccess) {
             __android_log_print(ANDROID_LOG_ERROR, APPNAME,
@@ -33,10 +34,30 @@ public:
         streamBuilder.openStream(stream);
     }
 
-    std::shared_ptr<oboe::AudioStream> getStream() override {
-        __android_log_print(ANDROID_LOG_VERBOSE, APPNAME, "getStream called");
-        return stream;
-    };
+    bool getIsPlaying () const {
+        return isPlaying;
+    }
+
+    int turnOn () override {
+        mReadIndex = 0;
+        oboe::Result result = stream->requestStart();
+        int resCode = getResultCode(result);
+        if (resCode == 0) {
+            isPlaying = true;
+        }
+        return resCode;
+    }
+
+    int turnOff () override {
+        __android_log_print(ANDROID_LOG_INFO, APPNAME,
+                            "inside turn off");
+        oboe::Result result = stream->requestStop();
+
+        int resCode = getResultCode(result);
+
+        isPlaying = false;
+        return resCode;
+    }
 
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream* inpStream,
                                           void *voidAudioData,
@@ -49,6 +70,12 @@ public:
                 audioData[(i * channelCount) + j] = (float) audioFile.samples[j][mReadIndex];
             }
             mReadIndex++;
+            if (mReadIndex >= numFileSamples - 1) {
+                __android_log_print(ANDROID_LOG_INFO, APPNAME,
+                                    "end of song");
+                turnOff();
+                return oboe::DataCallbackResult::Stop;
+            }
         }
 
         return oboe::DataCallbackResult::Continue;
@@ -56,6 +83,8 @@ public:
 
 private:
     AudioFile<float> audioFile;
+    int numFileSamples;
+    bool isPlaying = false;
     long int mReadIndex = 0;
     std::shared_ptr<oboe::AudioStream> stream;
     int sampleRate = 48000;
