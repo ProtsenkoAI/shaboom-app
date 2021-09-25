@@ -1,19 +1,29 @@
 package com.example.jnidemo
 
 import android.Manifest
+import android.net.Uri
 import android.os.Bundle
+import android.os.ParcelFileDescriptor
 import android.view.View
 import android.widget.Button
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.github.mikephil.charting.charts.LineChart
+import java.io.File
 import java.util.*
+import android.media.MediaPlayer
+
 
 class SongActivity: AppCompatActivity(), View.OnClickListener {
     override fun onCreate(savedInstanceState: Bundle?) {
          val passedDataBundle = intent.extras!!
-        val songDataPath = passedDataBundle.getString("song_data_path")
-        println("songDataPath inside SongActivity $songDataPath")
+        val songAudioPath = passedDataBundle.getString("song_data_path") + "audio.wav"
+        val songAudio = File(songAudioPath)
+        audioFileDescriptor = contentResolver.openFileDescriptor(Uri.fromFile(songAudio), "r")!!.detachFd()
+        println("file size: ${songAudio.length()}")
+
+        println("file descriptor $audioFileDescriptor")
+
 //        audioFileDescriptor = passedDataBundle!!.getInt("fileDescriptor")
 //        targetPitches = passedDataBundle.getFloatArray("targetPitches")
 
@@ -66,9 +76,10 @@ class SongActivity: AppCompatActivity(), View.OnClickListener {
     }
 
     private fun start() {
+        println("calling turn on stream")
         outputManager = OutputManager(audioFileDescriptor!!, ::songEndCallback )
-
         outputManager!!.turnOnStream()
+        println("after call turn on stream")
         if (microPermGranted) {
             replotTask = ReplotTask(inputManager, chart!!, resources)
             inputManager.turnOnStream()

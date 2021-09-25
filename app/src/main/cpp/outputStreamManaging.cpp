@@ -14,7 +14,15 @@ class OutputStreamManager : public StreamManager, oboe::AudioStreamDataCallback 
 public:
 
     explicit OutputStreamManager(int fd) {
-        bool loadSuccess = audioFile.load(fd);
+        __android_log_print(ANDROID_LOG_INFO, APPNAME,
+                            "NDK loading descriptor %d", fd);
+        bool loadSuccess = false;
+        try {
+            loadSuccess = audioFile.load(fd);
+        } catch (std::exception& e) {
+            __android_log_print(ANDROID_LOG_ERROR, APPNAME,
+                                "failed to load wav %s", e.what());
+        }
         numFileSamples = audioFile.getNumSamplesPerChannel();
 
         if (!loadSuccess) {

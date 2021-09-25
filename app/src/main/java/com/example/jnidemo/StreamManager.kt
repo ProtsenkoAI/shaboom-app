@@ -26,9 +26,8 @@ abstract class StreamManager() {
 
     open fun turnOffStream() {
         val status = ExternalGate.turnOffStream(getEngineHandle())
-        if (status == 0) {
-            isOpen = false
-        } else {
+        isOpen = false
+        if (status != 0) {
             Log.e("Close stream failed", "status: $status")
         }
 
