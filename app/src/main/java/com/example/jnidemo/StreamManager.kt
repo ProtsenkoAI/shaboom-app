@@ -28,9 +28,8 @@ abstract class StreamManager() {
         val status = ExternalGate.turnOffStream(getEngineHandle())
         isOpen = false
         if (status != 0) {
-            Log.e("Close stream failed", "status: $status")
+            println("Close stream failed $status")
         }
-
     }
 
     open fun turnOnStream() {
@@ -38,9 +37,9 @@ abstract class StreamManager() {
         val status = ExternalGate.turnOnStream(engineHandle);
         if (status == 0) {
             isOpen = true
-            Log.i("Open stream success", "")
+            println("Open stream success")
         } else {
-            Log.e("Open stream failed", "status: $status")
+            println("Open stream failed $status")
         }
     }
 
@@ -93,16 +92,17 @@ class OutputManager(fileDescriptor: Int, private val songEndCallback: () -> Unit
 
     override fun turnOnStream() {
         super.turnOnStream()
-        callEndCallbackTask = CallSongEndCallbackTask(songEndCallback, ::getIsPlaying)
         // just call native 2 times a second and if outputstream is stopped, call callback
         // delay is so big because out stream should be started at first
+        callEndCallbackTask = CallSongEndCallbackTask(songEndCallback, ::getIsPlaying)
         checkIsPlayingTimer.schedule(callEndCallbackTask, 10000, 500)
     }
 
     override fun turnOffStream() {
-        super.turnOffStream()
         callEndCallbackTask!!.cancel()
+        callEndCallbackTask = null;
         checkIsPlayingTimer.purge() // needed to schedule the task again
+        super.turnOffStream()
     }
 
     private var callEndCallbackTask: CallSongEndCallbackTask? = null
@@ -114,7 +114,6 @@ class CallSongEndCallbackTask(private val songEndCallback: () -> Unit,
                               private val getIsPlaying: () -> Boolean
 ) : TimerTask() {
     override fun run() {
-        println("calling get is playing")
         if (!getIsPlaying()) {
             println("calling song end callback")
             songEndCallback()

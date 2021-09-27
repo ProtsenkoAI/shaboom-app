@@ -7,8 +7,8 @@
 
 
 class StreamManager {
-    // TODO: check results opening streams and start / stop are OK
     // TODO: separate storing data from stream from this class
+    // TODO: close streams in destructor
 public:
     virtual int turnOn() = 0;
     virtual  int turnOff() = 0;

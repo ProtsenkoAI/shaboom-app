@@ -1,24 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--TODO: make normal elevation-->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/song_list_elem"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-
     android:onClick="songChosen"
-
+    android:clipChildren="false"
     >
-    <TextView
-        android:id="@+id/textView"
+    <RelativeLayout
+        android:id="@+id/song_list_elem_inner"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="40dp"
-        android:layout_marginEnd="20dp"
-        android:gravity="center"
-        android:padding="5dp"
-        android:text="Text View"
-        android:textColor="#000000"
-        android:textSize="40sp"
-        android:textStyle="bold|italic"
-        />
+        android:layout_height="match_parent"
+        android:onClick="songChosen"
+        android:elevation="8dp"
+        android:layout_marginVertical="8dp"
+        android:layout_marginHorizontal="16dp"
+        android:background="@drawable/roundstyle"
+        android:backgroundTint="#F6F6F6"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="6dp"
+        >
 
+        <TextView
+            android:id="@+id/songName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:gravity="start"
+            android:text="Text View"
+            android:textColor="#000000"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            />
+
+            <TextView
+                android:id="@+id/songPerformer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@+id/songName"
+                android:layout_alignStart="@id/songName"
+                android:layout_alignEnd="@id/songName"
+                android:layout_marginTop="0dp"
+                android:text="TextView"
+                />
+
+    </RelativeLayout>
 </RelativeLayout>

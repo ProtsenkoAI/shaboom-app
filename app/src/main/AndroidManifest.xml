@@ -29,6 +29,7 @@
         </activity>
 
         <activity
+            android:theme="@android:style/Theme.NoTitleBar"
             android:name=".SongChoosingActivity"
             android:screenOrientation="landscape"
             android:exported="true"
@@ -36,6 +37,7 @@
         </activity>
 
         <activity
+            android:theme="@android:style/Theme.Light.NoTitleBar"
             android:name=".SongActivity"
             android:screenOrientation="landscape"
             android:exported="true"

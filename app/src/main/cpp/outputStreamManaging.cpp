@@ -16,14 +16,9 @@ public:
     explicit OutputStreamManager(int fd) {
         __android_log_print(ANDROID_LOG_INFO, APPNAME,
                             "NDK loading descriptor %d", fd);
-        bool loadSuccess = false;
-        try {
-            loadSuccess = audioFile.load(fd);
-        } catch (std::exception& e) {
-            __android_log_print(ANDROID_LOG_ERROR, APPNAME,
-                                "failed to load wav %s", e.what());
-        }
+        bool loadSuccess = audioFile.load(fd);
         numFileSamples = audioFile.getNumSamplesPerChannel();
+        sampleRate = audioFile.getSampleRate();
 
         if (!loadSuccess) {
             __android_log_print(ANDROID_LOG_ERROR, APPNAME,
@@ -57,12 +52,8 @@ public:
     }
 
     int turnOff () override {
-        __android_log_print(ANDROID_LOG_INFO, APPNAME,
-                            "inside turn off");
         oboe::Result result = stream->requestStop();
-
         int resCode = getResultCode(result);
-
         isPlaying = false;
         return resCode;
     }
@@ -95,5 +86,5 @@ private:
     bool isPlaying = false;
     long int mReadIndex = 0;
     std::shared_ptr<oboe::AudioStream> stream;
-    int sampleRate = 48000;
+    int sampleRate;
 };

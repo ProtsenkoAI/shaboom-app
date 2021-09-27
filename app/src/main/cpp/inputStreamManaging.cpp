@@ -50,12 +50,19 @@ public:
     }
 
     int turnOn () override {
+        /**Should reset state and start stream (can be used multiple times if user starts/stops
+         * playing */
         oboe::Result result = stream->requestStart();
+        __android_log_print(ANDROID_LOG_INFO, APPNAME,
+                            "requested start");
         return getResultCode(result);
     }
 
     int turnOff () override {
         oboe::Result result = stream->requestStop();
+        __android_log_print(ANDROID_LOG_INFO, APPNAME,
+                            "requested stop");
+        pitches.clear();
         return getResultCode(result);
     }
 
@@ -77,18 +84,9 @@ public:
         }
         const auto *inputFloats = static_cast<const float *>(audioData);
 
-//        auto numSamples = numFrames * inpStream->getChannelCount();
-//        float inputSum = 0;
-//        for (int i = 0; i < numSamples; i++) {
-//            inputSum += *inputFloats;
-//            inputFloats++;
-//        }
 
         float inpMean = calcMean(inputFloats, numFrames);
         float inpStd = calcStd(inputFloats, inpMean, numFrames);
-        __android_log_print(ANDROID_LOG_INFO, APPNAME, "inp mean %f", inpMean);
-        __android_log_print(ANDROID_LOG_INFO, APPNAME, "inp std %f", inpStd);
-
         // TODO: maybe should apply batches here (e.g, now input has size (1024,), but
         //  should be (1, 1024)
         float inputNormalized[modelInputSize] = {};
@@ -110,10 +108,6 @@ public:
                 pitchProbs,
                 TfLiteTensorByteSize(outTensor));
 
-        __android_log_print(ANDROID_LOG_INFO, APPNAME, "from status %u", from_status);
-        __android_log_print(ANDROID_LOG_INFO, APPNAME, "invoke status %u", interpreter_invoke_status);
-        __android_log_print(ANDROID_LOG_INFO, APPNAME, "to status %u", to_status);
-
         int bestPitch = -1;
         float currPitchMax = -1.0f;
 
@@ -123,6 +117,8 @@ public:
                 bestPitch = i;
             }
         }
+//        __android_log_print(ANDROID_LOG_INFO, APPNAME,
+//                            "moving pitch to deque %d", bestPitch);
         if (currPitchMax >= pitchThresh) {
             pitches.push_front(bestPitch);
         } else {
@@ -155,7 +151,7 @@ private:
     // TODO: set min amd max pitches (and probably threshold) using user data
     const int minPitch = 80;
     const int maxPitch = 220;
-    constexpr const static float pitchThresh = 0.5;
+    constexpr const static float pitchThresh = 0.6;
 
     const static int modelInputSize = 1024;
     static const int pitchModelOutSize = 360;
@@ -170,4 +166,5 @@ private:
     std::deque<float> pitches;
     std::shared_ptr<oboe::AudioStream> stream;
     int inputChannelCount = oboe::ChannelCount::Mono;
+
 };
