@@ -23,8 +23,8 @@
 
 class InputStreamManager : public StreamManager, public oboe::AudioStreamDataCallback {
     // TODO: rewrite for stereo
-    // TODO: add filtering of pitches based on accumulated sum and count (to prevent spikes
-    //  in silence)
+    // TODO: add filtering of pitches based on accumulated sum, count and changes of value
+    //  (to prevent spikes in silence)
 public:
     explicit InputStreamManager (char* modelPath) {
         // TODO: move pitch detection to separate object
@@ -138,7 +138,7 @@ private:
         return sum / length;
     }
 
-    float calcStd(const float * arr, float& mean, int length) {
+    static float calcStd(const float * arr, float& mean, int length) {
         float var = 0;
         for(int i = 0; i < length; i++)
         {

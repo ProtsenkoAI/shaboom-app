@@ -6,6 +6,8 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.Button
+import android.widget.ImageButton
+import android.widget.ProgressBar
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.FragmentActivity
 import com.github.mikephil.charting.charts.LineChart
@@ -16,9 +18,11 @@ import com.google.gson.Gson
 
 
 class SongActivity: FragmentActivity(), View.OnClickListener {
-    // TODO: add "+" and "-" buttons
     // TODO: add metric fragment
     override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_song)
+
          val passedDataBundle = intent.extras!!
         val songAudioPath = passedDataBundle.getString("song_data_path") + "audio.wav"
         val songAudio = File(songAudioPath)
@@ -28,19 +32,22 @@ class SongActivity: FragmentActivity(), View.OnClickListener {
         targetPitches = loadPitchesFromFile(targetPitchesFile)
         Log.i("target pitches", targetPitches.toString())
 
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_song)
+
+        startButton = findViewById<Button>(R.id.button_start)
+        stopButton = findViewById<Button>(R.id.button_stop)
+        plusToneButton = findViewById<ImageButton>(R.id.plus_tonality_button)
+        minusToneButton = findViewById<ImageButton>(R.id.minus_tonality_button)
+        println("start button ${startButton.toString()}")
+        performanceBar = findViewById<ProgressBar>(R.id.user_performance_bar)
+
 
         chart = findViewById(R.id.chart)
         chart!!.setNoDataText("Hit the start button!")
-        replotTask = ReplotTask(inputManager, targetPitches!!, chart!!, resources)
+        replotTask = ReplotTask(inputManager, targetPitches!!, chart!!, performanceBar!!, resources, toneShift)
         replotTask!!.run()
 
-        val startButton = getStartButton()
-        val stopButton = findViewById<Button>(R.id.button_stop)
-
-        startButton.setOnClickListener(this)
-        stopButton.setOnClickListener(this)
+        startButton!!.setOnClickListener(this)
+        stopButton!!.setOnClickListener(this)
 
         val requestMicroPermissionLauncher = registerForActivityResult(
             ActivityResultContracts.RequestPermission()
@@ -62,27 +69,35 @@ class SongActivity: FragmentActivity(), View.OnClickListener {
         microPermGranted = isGranted
     }
 
-    private fun getStartButton(): Button {
-        val button = findViewById<Button>(R.id.button_start)
-        checkNotNull(button)
-        return button
-    }
-
     override fun onClick(button: View?) {
         // flag isStarted is used for cases when user taps same button multiple times
-        val startButton = getStartButton()
+        // TODO: separate onClick to coded classes of buttons to remove if-else's choosing button
         if (button == startButton) {
             if (! isStarted) {
                 start()
                 isStarted = true
             }
-        } else { // otherwise it's stop button
+        } else if (button == stopButton) { // otherwise it's stop button
             if (isStarted) {
                 stop()
                 isStarted = false
             }
+        } else if (button == plusToneButton) {
+            toneShift += toneStep
+            replotTask?. run {
+                replotTask!!.setToneShift(toneShift)
+            }
+        } else if (button == minusToneButton) {
+            toneShift -= toneStep
+            replotTask?. run {
+                replotTask!!.setToneShift(toneShift)
+            }
+        } else {
+            // TODO: add appropriate exception
+            throw RuntimeException("unknown button!")
         }
     }
+
 
     private fun start() {
         println("called start()")
@@ -92,7 +107,7 @@ class SongActivity: FragmentActivity(), View.OnClickListener {
         //  *start song* - output starts to copy from song file, input starts to save pitches
 
         if (microPermGranted) {
-            replotTask = ReplotTask(inputManager, targetPitches!!, chart!!, resources)
+            replotTask = ReplotTask(inputManager, targetPitches!!, chart!!, performanceBar!!, resources, toneShift)
             replotTask!!.run()
             replotTimer.schedule(replotTask, 0, replotMs)
             inputManager.turnOnStream()
@@ -124,7 +139,16 @@ class SongActivity: FragmentActivity(), View.OnClickListener {
     private var audioFileDescriptor: Int? = null
     private var microPermGranted = false
     private var isStarted = false
-    private var replotMs: Long = 20
+    private var replotMs: Long = 50
+    private var toneShift = 0
+    private val toneStep = 3
+
+
+    private var startButton: Button? = null
+    private var stopButton: Button? = null
+    private var plusToneButton: ImageButton? = null
+    private var minusToneButton: ImageButton? = null
+    private var performanceBar: ProgressBar? = null
 
     private var chart: LineChart? = null
 
