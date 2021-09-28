@@ -2,10 +2,10 @@
 
 ### Table of contents:
 
-1. About project
-2. Demonstration
-3. ML Pipeline
-4. Technologies
+1. [About project](#about-project)
+2. [Demonstration](#demonstration)
+3. [ML Pipeline](#ml-pipeline)
+4. [Technologies](#technologies)
 
 ## About project
 
