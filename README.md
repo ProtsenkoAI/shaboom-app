@@ -19,6 +19,7 @@ Workflow is:
 4. The student sings, the app compares musical notes that he sings with notes of an original singer (e.g. Freddie Mercury if you practice "Don't stop me now";)
 
 ## Demonstration
+### (Click on video to hear sound)
 [![Demo](./md_resources/demo.gif)](https://youtu.be/XcdNy_zi54w)
 
 ## ML Pipeline
